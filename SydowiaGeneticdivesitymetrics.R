@@ -1,4 +1,5 @@
 
+setwd("/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject")
 # Create output folder
 dir.create("genetic_diversityresults", showWarnings = FALSE)
 
@@ -17,9 +18,10 @@ summary_stats <- assembly_long %>%
   group_by(Metric) %>%
   summarise(
     Mean = mean(Value, na.rm = TRUE),
-    Max = max(Value, na.rm = TRUE)
+    Max = max(Value, na.rm = TRUE),
+    SD = sd(Value, na.rm =TRUE)
   ) %>%
-  pivot_longer(cols = c(Mean, Max), names_to = "Statistic", values_to = "Value")
+  pivot_longer(cols = c(Mean, Max, SD), names_to = "Statistic", values_to = "Value")
 
 # Separate plots
 plot1_data <- summary_stats %>%
@@ -64,217 +66,217 @@ Sydowiasssta_combined
 view (summary_stats)
 
 
-
-library(tidyverse)
-library(patchwork)
-
-# ---------------------------
-# 1) Where your FST files are
-# ---------------------------
-FST_DIR <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject/diversityfst1"
-
-# Read and combine all FST files in a folder
-fst_all <- list.files(pattern = "\\.windowed\\.weir\\.fst$", full.names = TRUE) %>%
-  purrr::map_dfr(function(f) {
-    x <- readr::read_tsv(f, comment = "#", show_col_types = FALSE)
-    
-    # pick an Fst column robustly
-    x <- x %>%
-      mutate(
-        Fst = case_when(
-          "WEIGHTED_FST" %in% names(x) ~ WEIGHTED_FST,
-          "MEAN_FST"     %in% names(x) ~ MEAN_FST,
-          TRUE                         ~ NA_real_
-        )
-      ) %>%
-      filter(!is.na(Fst))
-    
-    bn <- basename(f)
-    
-    # extract "popA" and "popB" from filenames like fst_<A>_vs_<B>_5000bp.windowed.weir.fst
-    m <- stringr::str_match(bn, "^fst_(.+)_vs_(.+)_\\d+bp\\.windowed\\.weir\\.fst$")
-    popA <- m[,2]; popB <- m[,3]
-    
-    # severity and region parsing
-    sevA <- case_when(
-      str_ends(popA, "_High") ~ "High",
-      str_ends(popA, "_LowModerate") ~ "LowModerate",
-      TRUE ~ "All"
-    )
-    sevB <- case_when(
-      str_ends(popB, "_High") ~ "High",
-      str_ends(popB, "_LowModerate") ~ "LowModerate",
-      TRUE ~ "All"
-    )
-    
-    regA <- str_replace(popA, "_(High|LowModerate)$", "")
-    regB <- str_replace(popB, "_(High|LowModerate)$", "")
-    
-    # classify comparison type
-    ctype <- case_when(
-      regA == regB && sevA != sevB ~ "Disease",  # within-region severity comparison
-      regA != regB && sevA == sevB ~ "Region",   # between-region at same severity (or All)
-      TRUE ~ "Mixed"               # both differ (optional bucket)
-    )
-    
-    clabel <- case_when(
-      ctype == "Disease" ~ paste0(regA, ": ", sevA, " vs ", sevB),
-      ctype == "Region"  ~ paste0(sevA, ": ", regA, " vs ", regB),
-      TRUE               ~ paste0(regA, "(", sevA, ") vs ", regB, "(", sevB, ")")
-    )
-    
-    x %>%
-      mutate(
-        file = bn,
-        popA = popA, popB = popB,
-        regionA = regA, regionB = regB,
-        severityA = sevA, severityB = sevB,
-        contrast_type = ctype,
-        contrast = clabel,
-        # IMPORTANT: x-axis scaffold should be scaffold only (no sample prefix)
-        SCAFFOLD = stringr::str_extract(CHROM, "scaffold\\d+")
-      )
-  })
-fst_plot_df <- fst_all %>% filter(contrast_type %in% c("Disease","Region"))
-
-make_manhattan <- function(df, out_png) {
-  
-  df <- df %>%
-    group_by(contrast, SCAFFOLD) %>%
-    mutate(max_pos = max(BIN_END, na.rm = TRUE)) %>%
-    ungroup()
-  
-  scaffold_sizes <- df %>%
-    distinct(contrast, SCAFFOLD, max_pos) %>%
-    arrange(contrast, SCAFFOLD) %>%
-    group_by(contrast) %>%
-    mutate(
-      offset = lag(cumsum(max_pos), default = 0),
-      mid_pos = offset + max_pos / 2
-    ) %>%
-    ungroup()
-  
-  plot_df <- df %>%
-    left_join(scaffold_sizes, by = c("contrast","SCAFFOLD","max_pos")) %>%
-    mutate(
-      genome_pos = BIN_START + offset,
-      col_group  = as.integer(factor(SCAFFOLD)) %% 2
-    )
-  
-  p <- ggplot(plot_df, aes(genome_pos, Fst, colour = factor(col_group))) +
-    geom_point(alpha = 0.8, size = 0.7) +
-    facet_wrap(~ contrast, ncol = 1, scales = "free_y") +
-    scale_x_continuous(
-      breaks = scaffold_sizes$mid_pos,
-      labels = scaffold_sizes$SCAFFOLD,
-      expand = expansion(mult = c(0.001, 0.001))
-    ) +
-    labs(x = "Scaffold", y = "Fst",
-         title = paste0("Genome-wide Fst (5 kb windows) — ", unique(df$contrast_type))) +
-    theme_bw(base_size = 12) +
-    theme(
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor.x = element_blank(),
-      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6),
-      legend.position = "none"
-    )
-  
-  ggsave(out_png, p, width = 10, height = 10, dpi = 300)
-  p
-}
-
-p_region  <- make_manhattan(fst_plot_df %>% filter(contrast_type=="Region"),
-                            "fst_manhattan_region.png")
-p_disease <- make_manhattan(fst_plot_df %>% filter(contrast_type=="Disease"),
-                            "fst_manhattan_disease.png")
-
-# ---------------------------
-# 5) Manhattan-style plots
-# ---------------------------
-fst_all <- fst_all %>%
-  group_by(contrast, SCAFFOLD) %>%
-  mutate(max_pos = max(BIN_END, na.rm = TRUE)) %>%
-  ungroup()
-
-scaffold_sizes_all <- fst_all %>%
-  distinct(contrast, SCAFFOLD, max_pos) %>%
-  arrange(contrast, SCAFFOLD) %>%
-  group_by(contrast) %>%
-  mutate(
-    offset = lag(cumsum(max_pos), default = 0),
-    mid_pos = offset + max_pos / 2
-  ) %>%
-  ungroup()
-
-fst_plot_all <- fst_all %>%
-  left_join(scaffold_sizes_all, by = c("contrast", "SCAFFOLD", "max_pos")) %>%
-  mutate(
-    genome_pos = BIN_START + offset,
-    col_group  = as.integer(factor(SCAFFOLD)) %% 2
-  )
-
-theme_pub <- theme_bw(base_size = 12) +
-  theme(
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6),
-    legend.position = "none"
-  )
-
-p_fst_all <- ggplot(fst_plot_all, aes(x = genome_pos, y = Fst, colour = factor(col_group))) +
-  geom_point(alpha = 0.8, size = 0.7) +
-  facet_wrap(~ contrast, ncol = 1, scales = "free_y") +
-  scale_x_continuous(
-    breaks = scaffold_sizes_all$mid_pos,
-    labels = scaffold_sizes_all$SCAFFOLD,
-    expand = expansion(mult = c(0.001, 0.001))
-  ) +
-  labs(
-    x = "Scaffold",
-    y = "Fst",
-    title = "Genome-wide Fst for pairwise contrasts (5 kb windows)"
-  ) +
-  theme_pub
-
-ggsave(file.path(FST_DIR, "fst_all_contrasts_manhattan.png"), p_fst_all,
-       width = 10, height = 10, dpi = 300)
-print(p_fst_all)
-
-# ---------------------------
-# 6) Boxplot grouped as requested
-#    - Disease vs Region separate
-#    - Region labels have NO High/LowModerate
-# ---------------------------
-fst_all <- fst_all %>%
-  mutate(
-    # Make a stable plotting order
-    contrast = fct_inorder(contrast),
-    group_type = factor(group_type, levels = c("Disease", "Region"))
-  )
-
-p_fst_box <- ggplot(fst_all, aes(x = contrast, y = Fst)) +
-  geom_boxplot(outlier.size = 0.4, alpha = 0.9) +
-  facet_wrap(~ group_type, scales = "free_x", ncol = 1) +
-  labs(
-    x = NULL,
-    y = "Fst",
-    title = "Fst distribution by contrast (Disease vs Region)"
-  ) +
-  theme_bw(base_size = 12) +
-  theme(
-    axis.text.x = element_text(angle = 20, hjust = 1),
-    legend.position = "none"
-  )
-
-ggsave(file.path(FST_DIR, "fst_group_boxplot_grouped.png"), p_fst_box,
-       width = 10, height = 6, dpi = 300)
-print(p_fst_box)
-
-# Optional combined figure
-Fst_combined <- p_fst_all / p_fst_box
-ggsave(file.path(FST_DIR, "Fst_combined.png"), Fst_combined,
-       width = 12, height = 14, dpi = 300)
-
+# 
+# library(tidyverse)
+# library(patchwork)
+# 
+# # ---------------------------
+# # 1) Where your FST files are
+# # ---------------------------
+# FST_DIR <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject/diversityfst1"
+# 
+# # Read and combine all FST files in a folder
+# fst_all <- list.files(pattern = "\\.windowed\\.weir\\.fst$", full.names = TRUE) %>%
+#   purrr::map_dfr(function(f) {
+#     x <- readr::read_tsv(f, comment = "#", show_col_types = FALSE)
+#     
+#     # pick an Fst column robustly
+#     x <- x %>%
+#       mutate(
+#         Fst = case_when(
+#           "WEIGHTED_FST" %in% names(x) ~ WEIGHTED_FST,
+#           "MEAN_FST"     %in% names(x) ~ MEAN_FST,
+#           TRUE                         ~ NA_real_
+#         )
+#       ) %>%
+#       filter(!is.na(Fst))
+#     
+#     bn <- basename(f)
+#     
+#     # extract "popA" and "popB" from filenames like fst_<A>_vs_<B>_5000bp.windowed.weir.fst
+#     m <- stringr::str_match(bn, "^fst_(.+)_vs_(.+)_\\d+bp\\.windowed\\.weir\\.fst$")
+#     popA <- m[,2]; popB <- m[,3]
+#     
+#     # severity and region parsing
+#     sevA <- case_when(
+#       str_ends(popA, "_High") ~ "High",
+#       str_ends(popA, "_LowModerate") ~ "LowModerate",
+#       TRUE ~ "All"
+#     )
+#     sevB <- case_when(
+#       str_ends(popB, "_High") ~ "High",
+#       str_ends(popB, "_LowModerate") ~ "LowModerate",
+#       TRUE ~ "All"
+#     )
+#     
+#     regA <- str_replace(popA, "_(High|LowModerate)$", "")
+#     regB <- str_replace(popB, "_(High|LowModerate)$", "")
+#     
+#     # classify comparison type
+#     ctype <- case_when(
+#       regA == regB && sevA != sevB ~ "Disease",  # within-region severity comparison
+#       regA != regB && sevA == sevB ~ "Region",   # between-region at same severity (or All)
+#       TRUE ~ "Mixed"               # both differ (optional bucket)
+#     )
+#     
+#     clabel <- case_when(
+#       ctype == "Disease" ~ paste0(regA, ": ", sevA, " vs ", sevB),
+#       ctype == "Region"  ~ paste0(sevA, ": ", regA, " vs ", regB),
+#       TRUE               ~ paste0(regA, "(", sevA, ") vs ", regB, "(", sevB, ")")
+#     )
+#     
+#     x %>%
+#       mutate(
+#         file = bn,
+#         popA = popA, popB = popB,
+#         regionA = regA, regionB = regB,
+#         severityA = sevA, severityB = sevB,
+#         contrast_type = ctype,
+#         contrast = clabel,
+#         # IMPORTANT: x-axis scaffold should be scaffold only (no sample prefix)
+#         SCAFFOLD = stringr::str_extract(CHROM, "scaffold\\d+")
+#       )
+#   })
+# fst_plot_df <- fst_all %>% filter(contrast_type %in% c("Disease","Region"))
+# 
+# make_manhattan <- function(df, out_png) {
+#   
+#   df <- df %>%
+#     group_by(contrast, SCAFFOLD) %>%
+#     mutate(max_pos = max(BIN_END, na.rm = TRUE)) %>%
+#     ungroup()
+#   
+#   scaffold_sizes <- df %>%
+#     distinct(contrast, SCAFFOLD, max_pos) %>%
+#     arrange(contrast, SCAFFOLD) %>%
+#     group_by(contrast) %>%
+#     mutate(
+#       offset = lag(cumsum(max_pos), default = 0),
+#       mid_pos = offset + max_pos / 2
+#     ) %>%
+#     ungroup()
+#   
+#   plot_df <- df %>%
+#     left_join(scaffold_sizes, by = c("contrast","SCAFFOLD","max_pos")) %>%
+#     mutate(
+#       genome_pos = BIN_START + offset,
+#       col_group  = as.integer(factor(SCAFFOLD)) %% 2
+#     )
+#   
+#   p <- ggplot(plot_df, aes(genome_pos, Fst, colour = factor(col_group))) +
+#     geom_point(alpha = 0.8, size = 0.7) +
+#     facet_wrap(~ contrast, ncol = 1, scales = "free_y") +
+#     scale_x_continuous(
+#       breaks = scaffold_sizes$mid_pos,
+#       labels = scaffold_sizes$SCAFFOLD,
+#       expand = expansion(mult = c(0.001, 0.001))
+#     ) +
+#     labs(x = "Scaffold", y = "Fst",
+#          title = paste0("Genome-wide Fst (5 kb windows) — ", unique(df$contrast_type))) +
+#     theme_bw(base_size = 12) +
+#     theme(
+#       panel.grid.major.x = element_blank(),
+#       panel.grid.minor.x = element_blank(),
+#       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6),
+#       legend.position = "none"
+#     )
+#   
+#   ggsave(out_png, p, width = 10, height = 10, dpi = 300)
+#   p
+# }
+# 
+# p_region  <- make_manhattan(fst_plot_df %>% filter(contrast_type=="Region"),
+#                             "fst_manhattan_region.png")
+# p_disease <- make_manhattan(fst_plot_df %>% filter(contrast_type=="Disease"),
+#                             "fst_manhattan_disease.png")
+# 
+# # ---------------------------
+# # 5) Manhattan-style plots
+# # ---------------------------
+# fst_all <- fst_all %>%
+#   group_by(contrast, SCAFFOLD) %>%
+#   mutate(max_pos = max(BIN_END, na.rm = TRUE)) %>%
+#   ungroup()
+# 
+# scaffold_sizes_all <- fst_all %>%
+#   distinct(contrast, SCAFFOLD, max_pos) %>%
+#   arrange(contrast, SCAFFOLD) %>%
+#   group_by(contrast) %>%
+#   mutate(
+#     offset = lag(cumsum(max_pos), default = 0),
+#     mid_pos = offset + max_pos / 2
+#   ) %>%
+#   ungroup()
+# 
+# fst_plot_all <- fst_all %>%
+#   left_join(scaffold_sizes_all, by = c("contrast", "SCAFFOLD", "max_pos")) %>%
+#   mutate(
+#     genome_pos = BIN_START + offset,
+#     col_group  = as.integer(factor(SCAFFOLD)) %% 2
+#   )
+# 
+# theme_pub <- theme_bw(base_size = 12) +
+#   theme(
+#     panel.grid.major.x = element_blank(),
+#     panel.grid.minor.x = element_blank(),
+#     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6),
+#     legend.position = "none"
+#   )
+# 
+# p_fst_all <- ggplot(fst_plot_all, aes(x = genome_pos, y = Fst, colour = factor(col_group))) +
+#   geom_point(alpha = 0.8, size = 0.7) +
+#   facet_wrap(~ contrast, ncol = 1, scales = "free_y") +
+#   scale_x_continuous(
+#     breaks = scaffold_sizes_all$mid_pos,
+#     labels = scaffold_sizes_all$SCAFFOLD,
+#     expand = expansion(mult = c(0.001, 0.001))
+#   ) +
+#   labs(
+#     x = "Scaffold",
+#     y = "Fst",
+#     title = "Genome-wide Fst for pairwise contrasts (5 kb windows)"
+#   ) +
+#   theme_pub
+# 
+# ggsave(file.path(FST_DIR, "fst_all_contrasts_manhattan.png"), p_fst_all,
+#        width = 10, height = 10, dpi = 300)
+# print(p_fst_all)
+# 
+# # ---------------------------
+# # 6) Boxplot grouped as requested
+# #    - Disease vs Region separate
+# #    - Region labels have NO High/LowModerate
+# # ---------------------------
+# fst_all <- fst_all %>%
+#   mutate(
+#     # Make a stable plotting order
+#     contrast = fct_inorder(contrast),
+#     group_type = factor(group_type, levels = c("Disease", "Region"))
+#   )
+# 
+# p_fst_box <- ggplot(fst_all, aes(x = contrast, y = Fst)) +
+#   geom_boxplot(outlier.size = 0.4, alpha = 0.9) +
+#   facet_wrap(~ group_type, scales = "free_x", ncol = 1) +
+#   labs(
+#     x = NULL,
+#     y = "Fst",
+#     title = "Fst distribution by contrast (Disease vs Region)"
+#   ) +
+#   theme_bw(base_size = 12) +
+#   theme(
+#     axis.text.x = element_text(angle = 20, hjust = 1),
+#     legend.position = "none"
+#   )
+# 
+# ggsave(file.path(FST_DIR, "fst_group_boxplot_grouped.png"), p_fst_box,
+#        width = 10, height = 6, dpi = 300)
+# print(p_fst_box)
+# 
+# # Optional combined figure
+# Fst_combined <- p_fst_all / p_fst_box
+# ggsave(file.path(FST_DIR, "Fst_combined.png"), Fst_combined,
+#        width = 12, height = 14, dpi = 300)
+# 
 
 
 
@@ -351,13 +353,13 @@ scaffold_order_numeric <- function(scaffold_vec) {
 # Pretty labels for facets (exactly as you described)
 facet_label_map <- function(key) {
   dplyr::case_when(
-    key == norm_pair_key("North_LowModerate","North_High") ~ "Disease: North LowModerate vs North High",
-    key == norm_pair_key("North_LowModerate","South_High") ~ "Disease: North LowModerate vs South High",
-    key == norm_pair_key("South_High","North_High")        ~ "Disease: South High vs North High",
-    key == norm_pair_key("South_High","South_LowModerate") ~ "Disease: South High vs South LowModerate",
-    key == norm_pair_key("South","North")                  ~ "Region: South vs North",
-    key == norm_pair_key("North","OAWEST")                 ~ "Region: North vs OAWEST",
-    key == norm_pair_key("South","OAWEST")                 ~ "Region: South vs OAWEST",
+    key == norm_pair_key("North_LowModerate","North_High") ~ "North Low/Moderate vs North High",
+    key == norm_pair_key("North_LowModerate","South_High") ~  "North Low/Moderate vs South High",
+    key == norm_pair_key("South_High","North_High")        ~ "South High vs North High",
+    key == norm_pair_key("South_High","South_LowModerate") ~ "South High vs South Low/Moderate",
+    key == norm_pair_key("South","North")                  ~ "South vs North",
+    key == norm_pair_key("North","OAWEST")                 ~ "North vs OAWEST",
+    key == norm_pair_key("South","OAWEST")                 ~ "South vs OAWEST",
     TRUE ~ key
   )
 }
@@ -397,7 +399,8 @@ make_manhattan <- function(df, out_png, title) {
     scale_x_continuous(
       breaks = scaffold_sizes$mid_pos,
       labels = scaffold_sizes$SCAFFOLD,   # <- ONLY scaffold number like 1,2,3...
-      expand = expansion(mult = c(0.001, 0.001))
+      expand = expansion(mult = c(0.001, 0.001)),
+      guide  = guide_axis(angle = 90, check.overlap = TRUE)
     ) +
     labs(x = "Scaffold", y = "Fst", title = title) +
     theme_bw(base_size = 12) +
@@ -408,7 +411,7 @@ make_manhattan <- function(df, out_png, title) {
       legend.position = "none"
     )
   
-  ggsave(out_png, p, width = 10, height = 10, dpi = 300)
+  ggsave(out_png, p, width = 20, height = 15, dpi = 600)
   p
 }
 
@@ -553,15 +556,15 @@ p_mh_reg <- make_manhattan(
 )
 
 p_box_dis <- make_box(
-  fst_disease,
-  OUT_BOX_DISEASE_PNG,
-  "Fst distribution — DISEASE"
+fst_disease,
+OUT_BOX_DISEASE_PNG,
+"Fst distribution — DISEASE"
 )
-
+# 
 p_box_reg <- make_box(
-  fst_region,
-  OUT_BOX_REGION_PNG,
-  "Fst distribution — REGION"
+fst_region,
+OUT_BOX_REGION_PNG,
+"Fst distribution — REGION"
 )
 
 # Combined figure (optional)
@@ -573,19 +576,68 @@ if (!is.null(p_box_reg)) plots <- c(plots, list(p_box_reg))
 
 if (length(plots) >= 2) {
   combined <- wrap_plots(plots, ncol = 2)
-  ggsave(OUT_COMBINED_PNG, combined, width = 18, height = 12, dpi = 300)
+  ggsave(OUT_COMBINED_PNG, combined, width = 25, height = 10, dpi = 600)
   message("Wrote: ", OUT_COMBINED_PNG)
 }
 
+
+
+
+library(patchwork)
+
+#-----------------------------#
+# Manhattan-only figure
+#-----------------------------#
+mh_plots <- list()
+if (!is.null(p_mh_dis)) mh_plots <- c(mh_plots, list(p_mh_dis))
+if (!is.null(p_mh_reg)) mh_plots <- c(mh_plots, list(p_mh_reg))
+
+if (length(mh_plots) >= 1) {
+  combined_manhattan <- wrap_plots(mh_plots, ncol = 1)
+  ggsave(
+    "manhattan_combined.png",
+    combined_manhattan,
+    width = 18,
+    height = 12,
+    dpi = 600
+  )
+  message("Wrote: manhattan_combined.png")
+}
+
+#-----------------------------#
+# Boxplot-only figure
+#-----------------------------#
+box_plots <- list()
+if (!is.null(p_box_dis)) box_plots <- c(box_plots, list(p_box_dis))
+if (!is.null(p_box_reg)) box_plots <- c(box_plots, list(p_box_reg))
+
+if (length(box_plots) >= 1) {
+  combined_box <- wrap_plots(box_plots, ncol = 1)
+  ggsave(
+    "boxplot_combined.png",
+    combined_box,
+    width = 14,
+    height = 10,
+    dpi = 600
+  )
+  message("Wrote: boxplot_combined.png")
+}
 message("Done.")
 
 
 
-#Genome-wide nucleotide diversity (π) and Tajima’s 
+
+
+
+
+
+
+
+#Genome-wide nucleotide diversity (π) and Tajima’s
 
 
 folder1 <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject/diversity_stats"
-  
+
 pi_file1      <- file.path(folder1, "pi_5000bp.windowed.pi")
 tajima_file1  <- file.path(folder1,"tajimaD_5000bp.Tajima.D")
 window_size   <- 5000    # for titles
@@ -616,22 +668,50 @@ tajima_df1 <- tajima_df1 %>%
 
 ## --------- BUILD GENOME-WIDE COORDINATES (ALL SCAFFOLDS) ---------
 ## Use π table to define scaffold lengths
+# scaffold_sizes1 <- pi_df1 %>%
+#   group_by(SCAFFOLD, scaffold_n) %>%
+#   summarise(max_pos = max(BIN_END, na.rm = TRUE), .groups = "drop") %>%
+#   arrange(scaffold_n) %>%                      # numeric order
+#   mutate(
+#     offset = lag(cumsum(max_pos), default = 0),
+#     mid_pos = offset + max_pos / 2
+#   )
+# 
+# ## Add genome-wide position to π and Tajima tables
+# pi_plot_df1 <- pi_df1 %>%
+#   left_join(scaffold_sizes1, by = c("SCAFFOLD", "scaffold_n")) %>%
+#   mutate(genome_pos = BIN_START + offset)
+# 
+# tajima_plot_df1 <- tajima_df1 %>%
+#   left_join(scaffold_sizes1, by = c("SCAFFOLD", "scaffold_n")) %>%
+#   mutate(genome_pos = BIN_START + offset)
+
+
+# Build ordered scaffold table
 scaffold_sizes1 <- pi_df1 %>%
   group_by(SCAFFOLD, scaffold_n) %>%
   summarise(max_pos = max(BIN_END, na.rm = TRUE), .groups = "drop") %>%
-  arrange(scaffold_n) %>%                      # numeric order
+  filter(!is.na(scaffold_n)) %>%
+  arrange(scaffold_n, SCAFFOLD) %>%
   mutate(
-    offset = lag(cumsum(max_pos), default = 0),
-    mid_pos = offset + max_pos / 2
+    offset = cumsum(lag(max_pos, default = 0)),
+    mid_pos = offset + max_pos / 2,
+    scaffold_group = rep(c("A", "B"), length.out = n())   # force true alternation
   )
 
-## Add genome-wide position to π and Tajima tables
+# Add genome-wide position and ordered color group
 pi_plot_df1 <- pi_df1 %>%
-  left_join(scaffold_sizes1, by = c("SCAFFOLD", "scaffold_n")) %>%
+  left_join(
+    scaffold_sizes1 %>% select(SCAFFOLD, scaffold_n, offset, mid_pos, scaffold_group),
+    by = c("SCAFFOLD", "scaffold_n")
+  ) %>%
   mutate(genome_pos = BIN_START + offset)
 
 tajima_plot_df1 <- tajima_df1 %>%
-  left_join(scaffold_sizes1, by = c("SCAFFOLD", "scaffold_n")) %>%
+  left_join(
+    scaffold_sizes1 %>% select(SCAFFOLD, scaffold_n, offset, mid_pos, scaffold_group),
+    by = c("SCAFFOLD", "scaffold_n")
+  ) %>%
   mutate(genome_pos = BIN_START + offset)
 
 ## --------- SUMMARY VALUES FOR RESULTS ---------
@@ -699,8 +779,8 @@ theme_pub <- theme_bw(base_size = 12) +
 
 ## --------- COMBINED MANHATTAN PANEL: Pi + TajimaD ---------
 p_panel1 <- ggplot(
-  long_df1,
-  aes(x = genome_pos, y = value, colour = factor(col_group))
+  pi_plot_df1,
+  aes(x = genome_pos, y = value, color = scaffold_group)
 ) +
   geom_point(alpha = 0.6, size = 0.8) +
   geom_smooth(
@@ -733,6 +813,12 @@ ggsave("diversity_panel_pi_tajimaD_allScaffolds.png",
        p_panel1, width = 10, height = 7, dpi = 300)
 print(p_panel1)
 
+
+
+scaffold_sizes1 %>%
+  count(scaffold_n) %>%
+  filter(n > 1)
+
 ## --------- OPTIONAL: separate Manhattan plots ---------
 p_pi1 <- ggplot(pi_plot_df1,
                 aes(x = genome_pos, y = PI,
@@ -748,14 +834,13 @@ p_pi1 <- ggplot(pi_plot_df1,
   labs(
     x = "Scaffold",
     y = "Nucleotide diversity (π)",
-    title = paste0("nucleotide diversity (",
-                   window_size / 1000, " kb windows)")
+    #title = paste0("nucleotide diversity )
   ) +
   theme_pub +
   scale_colour_manual(values = c("#1f77b4", "#2ca02c"))
 
 ggsave("pi_manhattan_allScaffolds.png", p_pi1,
-       width = 10, height = 4, dpi = 300)
+       width = 12, height = 4, dpi = 300)
 
 p_td1 <- ggplot(tajima_plot_df1,
                 aes(x = genome_pos, y = TajimaD,
@@ -772,14 +857,112 @@ p_td1 <- ggplot(tajima_plot_df1,
   labs(
     x = "Scaffold",
     y = "Tajima's D",
-    title = paste0("Tajima's D (",
-                   window_size / 1000, " kb windows)")
+    #title = paste0("Tajima's D)
   ) +
   theme_pub +
   scale_colour_manual(values = c("#1f77b4", "#2ca02c"))
 
 ggsave("tajimaD_manhattan_allScaffolds.png", p_td1,
-       width = 10, height = 4, dpi = 300)
+       width = 12, height = 4, dpi = 300)
+
+
+
+
+
+library(dplyr)
+library(ggplot2)
+library(grid)
+
+## --------- COMBINE Pi + TajimaD INTO ONE LONG TABLE ---------
+panel_df1 <- bind_rows(
+  pi_plot_df1 %>%
+    transmute(
+      SCAFFOLD,
+      scaffold_n,
+      scaffold_group,
+      genome_pos,
+      value = PI,                        # change PI if your column name differs
+      stat  = "Nucleotide diversity (π)"
+    ),
+  tajima_plot_df1 %>%
+    transmute(
+      SCAFFOLD,
+      scaffold_n,
+      scaffold_group,
+      genome_pos,
+      value = TajimaD,                   # change TajimaD if your column name differs
+      stat  = "Tajima's D"
+    )
+) %>%
+  mutate(
+    stat = factor(stat, levels = c("Nucleotide diversity (π)", "Tajima's D"))
+  )
+
+## --------- COMBINED MANHATTAN PANEL: Pi + TajimaD ---------
+p_panel1 <- ggplot(
+  panel_df1,
+  aes(x = genome_pos, y = value, colour = scaffold_group)
+) +
+  geom_point(alpha = 0.6, size = 0.8) +
+  geom_smooth(
+    aes(group = 1),
+    method = "loess",
+    se = FALSE,
+    span = 0.25,
+    linewidth = 0.5,
+    colour = "black"
+  ) +
+  geom_hline(
+    data = data.frame(stat = "Nucleotide diversity (π)", yint = -Inf),
+    aes(yintercept = yint),
+    inherit.aes = FALSE,
+    colour = "black",
+    linewidth = 0.5
+  ) +
+  facet_grid(
+    rows = vars(stat),
+    scales = "free_y",
+    switch = "y"
+  ) +
+  scale_x_continuous(
+    breaks = scaffold_sizes1$mid_pos,
+    labels = scaffold_sizes1$SCAFFOLD,
+    expand = expansion(mult = c(0.001, 0.001))
+  ) +
+  scale_colour_manual(values = c("A" = "#2ca25f", "B" = "#3182bd")) +
+  labs(
+    x = "Scaffold",
+    y = NULL
+  ) +
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    strip.text.y.left = element_text(
+      angle = 90,
+      face = "bold",
+      size = 11
+    ),
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.5,
+      hjust = 1,
+      size = 7
+    ),
+    panel.spacing.y = unit(0.3, "lines"),
+    panel.border = element_blank(),
+    axis.line.x.top = element_blank(),
+    axis.line.x.bottom = element_line(colour = "black", linewidth = 0.5),
+    axis.line.y.left = element_line(colour = "black", linewidth = 0.5),
+    axis.line.y.right = element_blank()
+  )
+
+ggsave("diversity_panel_pi_tajimaD_allScaffolds.png",
+       p_panel1, width = 15, height = 8, dpi = 600)
+print(p_panel1)
+
+
 
 
 
@@ -794,20 +977,20 @@ folder <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal Apri
 
 pi_files <- c(
   "South"              = file.path(folder, "pi_South5000bp.windowed.pi"),
-  "South Low–Moderate" = file.path(folder, "pi_South_LowModerate_5000bp.windowed.pi"),
+  "South Low/Moderate"  = file.path(folder, "pi_South_LowModerate_5000bp.windowed.pi"),
   "South High"         = file.path(folder, "pi_South_High_5000bp.windowed.pi"),
   "North"              = file.path(folder, "pi_North_5000bp.windowed.pi"),
-  "North Low–Moderate" = file.path(folder, "pi_North_LowModerate_5000bp.windowed.pi"),
+  "North Low/Moderate"  = file.path(folder, "pi_North_LowModerate_5000bp.windowed.pi"),
   "North High"         = file.path(folder, "pi_North_High_5000bp.windowed.pi"),
   "OAWEST"             = file.path(folder, "pi_OAWEST_5000bp.windowed.pi")
 )
 
 taj_files <- c(
   "South"              = file.path(folder, "tajima_South5000bp.Tajima.D"),
-  "South Low–Moderate" = file.path(folder, "tajima_South_LowModerate_5000bp.Tajima.D"),
+  "South Low/Moderate"  = file.path(folder, "tajima_South_LowModerate_5000bp.Tajima.D"),
   "South High"         = file.path(folder, "tajima_South_High_5000bp.Tajima.D"),
   "North"              = file.path(folder, "tajima_North_5000bp.Tajima.D"),
-  "North Low–Moderate" = file.path(folder, "tajima_North_LowModerate_5000bp.Tajima.D"),
+  "North Low/Moderate"  = file.path(folder, "tajima_North_LowModerate_5000bp.Tajima.D"),
   "North High"         = file.path(folder, "tajima_North_High_5000bp.Tajima.D"),
   "OAWEST"             = file.path(folder, "tajima_OAWEST_5000bp.Tajima.D")
 )
@@ -858,10 +1041,10 @@ taj_all <- taj_all %>% filter(!is.na(TajimaD))
 # =============================================================================
 group_order <- c(
   "South",
-  "South Low–Moderate",
+  "South Low/Moderate",
   "South High",
   "North",
-  "North Low–Moderate",
+  "North Low/Moderate",
   "North High",
   "OAWEST"
 )
@@ -872,10 +1055,10 @@ taj_all$Group <- factor(taj_all$Group, levels = group_order)
 # Optional: keep your original palette idea, add new groups
 group_colors <- c(
   "South"              = "#1d91c0",
-  "South Low–Moderate" = "#253494",
+  "South Low/Moderate"       = "#253494",
   "South High"         = "#4c7fb9",
   "North"              = "#feb24c",
-  "North Low–Moderate" = "#f03b20",
+  "North Low/Moderate"       = "#f03b20",
   "North High"         = "#bd0026",
   "OAWEST"             = "#31a354"
 )
@@ -884,37 +1067,37 @@ group_colors <- c(
 # 5) π BOXPLOT
 # =============================================================================
 p_pi_box <- ggplot(pi_all, aes(x = Group, y = PI, fill = Group)) +
-  geom_boxplot(outlier.size = 0.7, width = 0.6) +
+  geom_boxplot(outlier.size = 0.4, width = 0.3) +
   scale_fill_manual(values = group_colors, drop = FALSE) +
   scale_y_log10() +
   labs(x = NULL, y = "Nucleotide diversity (π)") +
-  theme_bw(base_size = 14) +
+  theme_bw(base_size = 10) +
   theme(
     legend.position = "none",
     axis.text.x = element_text(angle = 25, hjust = 1)
   )
 
-ggsave("pi_group_boxplot.png", p_pi_box, width = 8, height = 5, dpi = 300)
+ggsave("pi_group_boxplot.png", p_pi_box, width = 5, height = 4, dpi = 300)
 
 # =============================================================================
 # 6) Tajima's D BOXPLOT
 # =============================================================================
 p_taj_box <- ggplot(taj_all, aes(x = Group, y = TajimaD, fill = Group)) +
-  geom_boxplot(outlier.size = 0.7, width = 0.6) +
+  geom_boxplot(outlier.size = 0.4, width = 0.3) +
   scale_fill_manual(values = group_colors, drop = FALSE) +
   labs(x = NULL, y = "Tajima's D") +
-  theme_bw(base_size = 14) +
+  theme_bw(base_size = 10) +
   theme(
     legend.position = "none",
     axis.text.x = element_text(angle = 25, hjust = 1)
   )
 
-ggsave("tajimaD_group_boxplot.png", p_taj_box, width = 8, height = 5, dpi = 300)
+ggsave("tajimaD_group_boxplot.png", p_taj_box, width = 5, height = 4, dpi = 300)
 
 # =============================================================================
 # 7) COMBINE
 # =============================================================================
-group_combined <- p_pi1 / p_pi_box  | p_td1  / p_taj_box  
+group_combined <- p_pi1 / p_td1   | p_pi_box  / p_taj_box  
 ggsave("group_combined.png", group_combined, width = 16, height = 6, dpi = 300)
 
 print(group_combined)
@@ -1133,6 +1316,9 @@ p_het <- ggplot(het_df,
 ggsave("het_per_individual.png", p_het, width = 6, height = 6, dpi = 300)
 p_het
 
+
+
+
 ## 7.2 Total ROH length per individual (Mb)
 p_roh_tot <- ggplot(roh_indiv,
                     aes(x = reorder(IID, total_Mb_ROH),
@@ -1141,7 +1327,7 @@ p_roh_tot <- ggplot(roh_indiv,
   geom_col() +
   coord_flip() +
   labs(
-    x = "Isolate",
+    x = "Isolates",
     y = "Total ROH length (Mb)",
     title = "Total ROH per individual"
   ) +
@@ -1152,8 +1338,13 @@ p_roh_tot <- ggplot(roh_indiv,
   )
 
 ggsave("roh_total_per_individual.png", p_roh_tot,
-       width = 6, height = 6, dpi = 300)
+       width = 10, height = 6, dpi = 300)
 p_roh_tot
+
+
+
+
+
 
 ## 7.3 Relationship: ROH vs heterozygosity
 p_scatter <- ggplot(het_roh,
@@ -1166,15 +1357,15 @@ p_scatter <- ggplot(het_roh,
   labs(
     x = "Total ROH length (Mb)",
     y = "Observed heterozygosity (H\u2092)",
-    title = "ROH vs heterozygosity across individuals"
+    #title = "ROH vs heterozygosity across individuals"
   ) +
   theme_bw(base_size = 13)
 
 ggsave("roh_vs_heterozygosity_scatter.png", p_scatter,
-       width = 5.5, height = 5, dpi = 300)
+       width = 7, height = 4, dpi = 300)
 p_scatter
 
-## 7.4 Distribution of ROH segment lengths (all isolates)
+## 7.4 Distribution of ROH segment lengths (all isolates) # plot not used.
 p_seg_hist <- ggplot(roh_seg, aes(x = seg_Mb)) +
   geom_histogram(bins = 40, fill = "blue2") +
   labs(
@@ -1197,7 +1388,7 @@ p_roh_box <- ggplot(roh_indiv,
   labs(
     x = NULL,
     y = "Total ROH length (Mb)",
-    title = "Total ROH by group"
+    #title = "Total ROH by group"
   ) +
   theme_bw(base_size = 13) +
   theme(
@@ -1213,9 +1404,61 @@ Foh_combined <- p_het | p_roh_tot
 ggsave("Foh_combined.png",
        Foh_combined, width = 14, height = 5, dpi = 300)
 
-Foh_combined1 <- p_roh_box | p_seg_hist
+Foh_combined1 <- p_roh_box | p_het_box | p_scatter
 ggsave("Foh_combined1.png",
        Foh_combined1, width = 14, height = 5, dpi = 300)
+
+
+## 7.5 Boxplots of hetero  by group
+library(ggplot2)
+library(dplyr)
+
+# Make sure Group exists (from your left_join) and Ho is numeric
+het_plot_df <- het_df %>%
+  filter(!is.na(Group), !is.na(Ho)) %>%
+  mutate(
+    Group = droplevels(as.factor(Group)),
+    Ho = as.numeric(Ho)
+  )
+
+p_het_box <- ggplot(het_plot_df, aes(x = Group, y = Ho, fill = Group)) +
+  geom_boxplot(outlier.size = 0.7, width = 0.6) +
+  labs(
+    x = NULL,
+    y = "Heterozygosity (Ho)",
+    #title = "Heterozygosity by group"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 25, hjust = 1)
+  )
+
+ggsave("heterozygosity_by_group_boxplot.png", p_het_box,
+       width = 5.5, height = 4.5, dpi = 300)
+
+p_het_box
+
+Fhet_combined <- p_het | p_het_box
+ggsave("Fhet_combined.png",
+       Fhet_combined, width = 14, height = 5, dpi = 300)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
