@@ -6,9 +6,6 @@ This repository contains the scripts and organized analysis materials used for t
 ### Workflow at a glance
 
 The analysis follows the sequence below. Individual scripts should be reviewed before execution because input names, directory paths, and parameters may have been tailored to the original dataset.
-## Links to my Code practice
-- [Code Practice 1](RmarkdownPractice.md)
-
 1. [Process chromatogram or sequence-read files](ab1processngscript.R) supports preparation of AB1-derived sequence data for later review and analysis.
 
 2. [Prepare ITS data](WorkingscriptITS.R) and the (ITS_script/) directory contain the ITS-focused processing workflow, including preparation of sequence data for comparison across samples.
