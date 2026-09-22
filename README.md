@@ -13,6 +13,7 @@ The analysis follows the sequence below. Individual scripts should be reviewed b
 3.Organize sequence inputs. [Base-called sequence files](basecalled/.)
 
 4.Review sequence quality. [Quality-control materials and intermediate outputs are organized in](QC/.)
+
 5.[Create and curate alignments.](minmaalign.sh) is a shell-based alignment helper used within the sequence-processing workflow. Alignment settings and any required external software should be checked directly in the script before use.
 
 6.[Run genome assembly with](flygeno.sh) preserves an additional command-line step used in the project workflow. 
