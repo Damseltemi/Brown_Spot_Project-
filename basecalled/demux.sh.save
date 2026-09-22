@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=demux
+#SBATCH --cpus-per-task=8
+#SBATCH --partition=general
+#SBATCH --time=1:00:00
+#SBATCH --output=logs/demux-%j.out
+#SBATCH --error=logs/demux-%j.err
+#SBATCH --mem=20G
+
+set -euo pipefail
+
+# Path to Dorado executable
+DORADO_PATH="/home/trf0019/software_app/dorado-0.7.1-linux-x64/bin/dorado"
+
+# Input BAM file to be demultiplexed
+INPUT_BAM="/scratch/acicola_project/20260114/20251106.bam"
+
+# Output directory for demultiplexed FASTQ files
+OUTPUT_DIR="/scratch/acicola_project/20260114/20260114_demux1"
+
+# Sample sheet CSV
+SAMPLE_SHEET="/scratch/acicola_project/20260114/no_sample_id/20260114_1105_MC-114852_FBC81239_8536e92c/samplesheet2026.csv"
+# Threads
+THREADS=8
+
+# Ensure output directory exists
+mkdir -p "$OUTPUT_DIR"
+
+# Check writability
+if [ ! -w "$OUTPUT_DIR" ]; then
+    echo "ERROR: Output directory not writable: $OUTPUT_DIR"
+    exit 1
+fi
+
+# Run Dorado demultiplexing
+$DORADO_PATH demux \
+  --emit-fastq \
+  --kit-name "SQK-NBD114-24" \
+  --emit-summary \
+  --output-dir "$OUTPUT_DIR" \
+  --threads "$THREADS" \
+  --sample-sheet "$SAMPLE_SHEET" \
+  "$INPUT_BAM"
+
+
+echo "Demultiplexing completed. Output: $OUTPUT_DIR"
