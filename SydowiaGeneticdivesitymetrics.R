@@ -1,5 +1,5 @@
 
-setwd("/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject")
+setwd("")
 # Create output folder
 dir.create("genetic_diversityresults", showWarnings = FALSE)
 
@@ -73,7 +73,7 @@ view (summary_stats)
 # # ---------------------------
 # # 1) Where your FST files are
 # # ---------------------------
-# FST_DIR <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject/diversityfst1"
+# FST_DIR <- ""
 # 
 # # Read and combine all FST files in a folder
 # fst_all <- list.files(pattern = "\\.windowed\\.weir\\.fst$", full.names = TRUE) %>%
@@ -288,7 +288,7 @@ suppressPackageStartupMessages({
 # =============================================================================
 # CONFIG
 # =============================================================================
-FST_DIR   <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject/diversityfst1"         # folder containing fst_*.windowed.weir.fst
+FST_DIR   <- ""         # folder containing fst_*.windowed.weir.fst
 WINDOW_BP <- 5000
 
 # --- What you want plotted (EXACT sets) ---
@@ -636,7 +636,7 @@ message("Done.")
 #Genome-wide nucleotide diversity (π) and Tajima’s
 
 
-folder1 <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject/diversity_stats"
+folder1 <- ""
 
 pi_file1      <- file.path(folder1, "pi_5000bp.windowed.pi")
 tajima_file1  <- file.path(folder1,"tajimaD_5000bp.Tajima.D")
@@ -973,7 +973,7 @@ suppressPackageStartupMessages({
   library(patchwork)
 })
 
-folder <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject/diversity_statsnew1"
+folder <- ""
 
 pi_files <- c(
   "South"              = file.path(folder, "pi_South5000bp.windowed.pi"),
@@ -1111,7 +1111,7 @@ ggsave("group_combined.png",
 group_combined 
 
 
-# ROH analysis
+# ROH analysis Not incluuded 
 
 library(tidyverse)
 library(janitor)
@@ -1120,7 +1120,7 @@ library(janitor)
 ## 1. FILE PATHS
 ## ==============================
 
-folder2 <- "/Users/temitopefolorunso/Desktop/Folorunso dissertation proposal April 2024/BrownSpotProject/hetero_homozy1"
+folder2 <- ""
 
 het_file       <- file.path(folder2, "het_individuals.het")
 roh_indiv_file <- file.path(folder2, "sydowia_roh.hom.indiv")
