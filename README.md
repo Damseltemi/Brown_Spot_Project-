@@ -1,7 +1,7 @@
 # Brown_Spot_Project-
 ## Overview
 
-This repository contains the scripts and organized analysis materials used for the Brown Spot Needle Blight (BSNB) project. The workflow supports the processing and analysis of fungal sequence data, with particular emphasis on the culturable internal transcribed spacer (ITS) region of symptomatic p. taeda needle. It moves from chromatogram-derived sequence inputs through sequence-quality review, ITS preparation and alignment, and downstream population-genetic summaries.
+This repository contains the scripts and organized analysis materials used for Genome analyse associated with the Brown Spot Needle Blight (BSNB) project. The workflow supports the processing and analysis of fungal sequence data, with particular emphasis on the culturable internal transcribed spacer (ITS) region of symptomatic p. taeda needle. It moves from chromatogram-derived sequence inputs through sequence-quality review, ITS preparation and alignment, and downstream population-genetic summaries of Sydowia polyspora.
 
 ### Workflow at a glance
 
@@ -28,7 +28,7 @@ The workflow uses R scripts and Unix shell scripts. A working installation of R 
 
 ### Contact
 
-For questions about the Brown Spot Needle Blight project, its data, or the intended use of the scripts, please contact the repository owner or the project research team
+For questions about the this project, its data, or the intended use of the scripts, please contact the repository owner or the project research team
 ### lab project 
 https://willoughbylab.auburn.edu/ 
 
