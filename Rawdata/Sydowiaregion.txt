@@ -1,0 +1,27 @@
+Isolates	region_disease
+BS09_240_002-4	pop_North_High
+BS09_240_002-7	pop_North_High
+BS09_CNT_040-2	pop_North_High
+BS09_120_061-2_combined.unique.sorted.bam	pop_North_LowModerate
+BS09_360_080-3_NBD_20241119	pop_North_LowModerate
+BS13_240_112-2	pop_North_LowModerate
+BS13_360_105_4_combined.unique.sorted.bam	pop_North_LowModerate
+BS13_360_106-6	pop_North_LowModerate
+BS14_240_170-1_NBD_20250416_Mk1D	pop_North_LowModerate
+BS21_CNT_582-1_NBD_20250326	pop_North_LowModerate
+BS22_360_573-3_NBD_20250326	pop_North_LowModerate
+BS00_240_177-2_Fifth_run	pop_South_High
+BS04_240_538-X_NBD_20241107	pop_South_High
+BS06_240_394-4	pop_South_High
+BS06_240_403-2_NBD_20250512_Mk1D	pop_South_High
+BS06_CNT_3AD-5_NBD_20250204	pop_South_High
+BS11_360_712-5-1_NBD_20241216	pop_South_High
+BS05_360_325-1	pop_South_High
+BS06_240_392-6_Fourth_run	pop_South_High
+BS11_240_256-2_NBD_20250526_Mk1C	pop_South_LowModerate
+BS12_120_853-2_NBD_20250526_Mk1C	pop_South_LowModerate
+BS08_360_127-6_NBD_20250416_Mk1C	pop_South_LowModerate
+BS17_240_437-1_NBD_20250319	OAWEST
+BS17_240_437-3_NBD_20250422	OAWEST
+TX2-6_NBD_20250516_Mk1C	OAWEST
+
