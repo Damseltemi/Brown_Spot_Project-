@@ -21,6 +21,7 @@ The analysis follows the sequence below. Individual scripts should be reviewed b
 7.[Calculate genetic-diversity and population-genetic metrics.](SydowiaGeneticdiversitymetrics.R) and the scripts in popgenscripts/ support downstream analysis of genetic variation.
 
 8.[Generate project-level analyses and summaries](BSNBdraft.R) contains additional R-based analysis, exploratory work, and/or figures used to synthesize the BSNB dataset.
+
 9. [Raw data and Genome fasta file](Rawdata) (https://doi.org/10.35099/a99z-qb09).
 
 ### Software and requirements
